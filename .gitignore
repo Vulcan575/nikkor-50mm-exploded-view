@@ -1,0 +1,4 @@
+_shots/
+*.py
+.DS_Store
+Thumbs.db

@@ -1,0 +1,1144 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NIKKOR 50mm f/1.8D · 交互式三维爆炸图</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230a0a0c'/%3E%3Cg fill='none' stroke='%23e8e8ec' stroke-width='1.6'%3E%3Ccircle cx='16' cy='16' r='10'/%3E%3Cpath d='M16 6 L20 16 L16 26 M16 6 L12 16 L16 26 M6 16 L20 16 M26 16 L12 16'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap">
+<style>
+  :root{
+    --fg:#1e1f24; --muted:#5c616b; --line:rgba(20,20,28,.14);
+    --panel:rgba(246,246,248,.82); --accent:#d9620a;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;overflow:hidden;background:#c2c2c4}
+  body{font-family:"Noto Sans SC","Segoe UI",system-ui,-apple-system,sans-serif;color:var(--fg);-webkit-font-smoothing:antialiased}
+  #c{position:fixed;inset:0;display:block;cursor:grab}
+  #c:active{cursor:grabbing}
+
+  /* ---------- 标题 ---------- */
+  #title{position:fixed;top:22px;left:26px;pointer-events:none;user-select:none}
+  #title h1{font-size:17px;font-weight:500;letter-spacing:.06em}
+  #title h1 b{font-weight:700}
+  #title p{margin-top:5px;font-size:11px;font-weight:300;color:var(--muted);letter-spacing:.08em}
+
+  /* ---------- 标签与引线 ---------- */
+  #labels{position:fixed;inset:0;pointer-events:none;overflow:hidden}
+  #leaders{position:fixed;inset:0;width:100%;height:100%;pointer-events:none}
+  .v-label{position:absolute;left:0;top:0;padding:5px 9px 5px 10px;border:1px solid var(--line);
+    background:rgba(250,250,252,.86);border-radius:3px;white-space:nowrap;opacity:0;will-change:transform,opacity}
+  .v-label .t{font-size:11.5px;font-weight:500;letter-spacing:.03em;line-height:1.35}
+  .v-label .s{font-size:10px;font-weight:300;color:var(--muted);margin-top:2px;letter-spacing:.02em;line-height:1.35}
+  .v-label .bar{position:absolute;left:0;top:3px;bottom:3px;width:2px;border-radius:2px;background:#34363c}
+
+  /* ---------- 控制坞 ---------- */
+  #dock{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);
+    width:min(780px,94vw);background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    padding:13px 20px 14px;display:grid;grid-template-columns:1fr 1fr auto;gap:12px 26px;align-items:center;
+    backdrop-filter:blur(8px)}
+  .ctl-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:1px}
+  .ctl-head span{font-size:11px;color:var(--muted);letter-spacing:.08em}
+  .ctl-head output{font-size:11px;color:#26282e;font-variant-numeric:tabular-nums;letter-spacing:.04em}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:18px;background:transparent;outline:none}
+  input[type=range]::-webkit-slider-runnable-track{height:2px;border-radius:2px;
+    background:linear-gradient(90deg,#3a3c42 var(--fill,50%),rgba(0,0,0,.16) var(--fill,50%))}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;
+    background:#f6f6f8;margin-top:-5.5px;border:none;box-shadow:0 0 0 3px rgba(0,0,0,.12)}
+  input[type=range]::-moz-range-track{height:2px;background:rgba(0,0,0,.16);border-radius:2px}
+  input[type=range]::-moz-range-progress{height:2px;background:#3a3c42;border-radius:2px}
+  input[type=range]::-moz-range-thumb{width:13px;height:13px;border-radius:50%;background:#f6f6f8;border:none}
+  .ticks{position:relative;height:12px;margin-top:2px}
+  .ticks i{position:absolute;top:0;transform:translateX(-50%);font-style:normal;
+    font-size:8.5px;font-weight:300;color:#7c828c;letter-spacing:.02em;font-variant-numeric:tabular-nums}
+  .btns{display:flex;gap:8px;justify-content:flex-end}
+  .btn{appearance:none;border:1px solid var(--line);background:transparent;color:#22242a;border-radius:7px;
+    padding:9px 16px;font-size:12px;letter-spacing:.06em;cursor:pointer;font-family:inherit;transition:border-color .18s,background .18s}
+  .btn:hover{border-color:rgba(0,0,0,.42)}
+  .btn.primary{background:#1c1d22;color:#f2f2f4;border-color:#1c1d22;font-weight:500}
+  .btn.primary:hover{background:#000;border-color:#000}
+
+  #hint{position:fixed;right:24px;bottom:26px;font-size:10px;font-weight:300;color:#666b75;
+    letter-spacing:.1em;pointer-events:none;text-align:right;line-height:1.8}
+  #credit{position:fixed;left:26px;bottom:24px;font-size:10px;font-weight:300;color:#5f646d;
+    letter-spacing:.06em;pointer-events:none;line-height:1.7;max-width:46%}
+  #loader{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#c2c2c4;
+    z-index:10;transition:opacity .6s;font-size:11px;letter-spacing:.22em;color:#4d525b}
+
+  @media (max-width:720px){
+    #dock{grid-template-columns:1fr;padding:12px 16px;bottom:12px;gap:10px}
+    .btns{justify-content:stretch}
+    .btns .btn{flex:1;min-height:44px}
+    #title{top:14px;left:16px}
+    #hint,#credit{display:none}
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<svg id="leaders"></svg>
+<div id="labels"></div>
+
+<div id="title">
+  <h1><b>NIKKOR</b> 50mm f/1.8D</h1>
+  <p>交互式三维爆炸图 · 双高斯 六片四组</p>
+</div>
+
+<div id="dock">
+  <div class="ctl">
+    <div class="ctl-head"><span>爆炸程度</span><output id="outExplode">0%</output></div>
+    <input type="range" id="slExplode" min="0" max="100" value="0" step="1" aria-label="爆炸程度">
+  </div>
+  <div class="ctl">
+    <div class="ctl-head"><span>光圈开合</span><output id="outAperture">f/1.8</output></div>
+    <input type="range" id="slAperture" min="0" max="8" value="0" step="1" aria-label="光圈开合">
+    <div class="ticks" id="apTicks"></div>
+  </div>
+  <div class="btns">
+    <button class="btn primary" id="btnAuto">自动演示</button>
+    <button class="btn" id="btnReset">复位视角</button>
+  </div>
+</div>
+
+<div id="hint">左键拖拽 旋转 · 右键 平移<br>滚轮 缩放</div>
+<div id="credit">全部几何体、刻字与纹理均为程序生成，未使用外部模型。<br>渲染引擎 Three.js（MIT License）</div>
+<div id="loader">LOADING</div>
+
+<script src="assets/three/build/three.min.js"></script>
+<script src="assets/three/examples/postprocessing/Pass.js"></script>
+<script src="assets/three/examples/shaders/CopyShader.js"></script>
+<script src="assets/three/examples/postprocessing/ShaderPass.js"></script>
+<script src="assets/three/examples/postprocessing/EffectComposer.js"></script>
+<script src="assets/three/examples/postprocessing/RenderPass.js"></script>
+<script src="assets/three/examples/shaders/LuminosityHighPassShader.js"></script>
+<script src="assets/three/examples/postprocessing/UnrealBloomPass.js"></script>
+<script src="assets/three/examples/shaders/GammaCorrectionShader.js"></script>
+<script src="assets/three/examples/lights/RectAreaLightUniformsLib.js"></script>
+<script src="assets/three/examples/environments/RoomEnvironment.js"></script>
+<script src="assets/three/examples/controls/OrbitControls.js"></script>
+<script>
+
+/* ================= 渲染器 / 场景 / 相机 ================= */
+const canvas = document.getElementById('c');
+const isMobile = innerWidth < 720;
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, isMobile ? 1.6 : 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.physicallyCorrectLights = true;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xc2c2c4);
+scene.fog = new THREE.Fog(0xc2c2c4, 28, 58);
+
+const camera = new THREE.PerspectiveCamera(isMobile ? 42 : 34, innerWidth/innerHeight, 0.1, 100);
+const viewDir = new THREE.Vector3(-.05,.13,1).normalize();
+camera.position.set(-.25,0,0).addScaledVector(viewDir, isMobile ? 11.6 : 8.4);
+
+const controls = new THREE.OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.minDistance = 3.2;
+controls.maxDistance = 26;
+controls.minPolarAngle = 0.14;
+controls.maxPolarAngle = Math.PI - 0.14;
+controls.target.set(-0.25, 0, 0);
+
+/* ================= 程序化纹理（Canvas） ================= */
+function canvasTex(w, h, draw, srgb=true){
+  const cv = document.createElement('canvas');
+  cv.width = w; cv.height = h;
+  const ctx = cv.getContext('2d');
+  draw(ctx, w, h);
+  const t = new THREE.CanvasTexture(cv);
+  if(srgb) t.encoding = THREE.sRGBEncoding;
+  t.anisotropy = 8;
+  return t;
+}
+const rgba = (c,a)=>`rgba(${c>>16&255},${c>>8&255},${c&255},${a})`;
+function softStrip(ctx, cx, cy, len, th, color, alpha, rot=0){
+  ctx.save(); ctx.translate(cx, cy); ctx.rotate(rot); ctx.scale(1, th/len);
+  const g = ctx.createRadialGradient(0,0,0,0,0,len/2);
+  g.addColorStop(0, rgba(color, alpha));
+  g.addColorStop(0.55, rgba(color, alpha*0.45));
+  g.addColorStop(1, rgba(color, 0));
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0,0,len/2,0,7); ctx.fill();
+  ctx.restore();
+}
+
+/* IBL 环境：RoomEnvironment 程序化摄影棚（金属拉丝与刻字反射细节来源） */
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new THREE.RoomEnvironment(), 0.04).texture;
+
+/* 背光墙纹理 */
+const wallTex = canvasTex(1024, 512, (ctx,w,h)=>{
+  const g = ctx.createLinearGradient(0,0,0,h);
+  g.addColorStop(0,'#0b0c0f'); g.addColorStop(0.55,'#08080a'); g.addColorStop(1,'#060607');
+  ctx.fillStyle = g; ctx.fillRect(0,0,w,h);
+  softStrip(ctx, 470, 210, 760, 150, 0xfff2e2, 0.13, 0.02);
+  softStrip(ctx, 760, 230, 380, 110, 0x9fc0ff, 0.10, -0.1);
+  softStrip(ctx, 180, 300, 300, 90, 0xffb178, 0.07, 0.1);
+});
+
+/* 地面接触阴影 */
+const blobTex = canvasTex(512, 256, (ctx,w,h)=>{
+  ctx.save(); ctx.translate(w/2,h/2); ctx.scale(1, h/w);
+  const g = ctx.createRadialGradient(0,0,0,0,0,w/2);
+  g.addColorStop(0,'rgba(0,0,0,0.6)'); g.addColorStop(0.6,'rgba(0,0,0,0.28)'); g.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0,0,w/2,0,7); ctx.fill();
+  ctx.restore();
+}, false);
+
+/* 菱形橡胶滚花（bump） */
+const knurlTex = canvasTex(256, 256, (ctx,w,h)=>{
+  ctx.fillStyle = '#808080'; ctx.fillRect(0,0,w,h);
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = '#a6a6a6';
+  for(let i=-h;i<w+h;i+=14){ ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i+h,h); ctx.stroke(); }
+  ctx.strokeStyle = '#5a5a5a';
+  for(let i=0;i<w+h*2;i+=14){ ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i-h,h); ctx.stroke(); }
+}, false);
+knurlTex.wrapS = knurlTex.wrapT = THREE.RepeatWrapping;
+knurlTex.repeat.set(14, 1);
+
+/* 阳极氧化细颗粒（bump） */
+const anodizedTex = canvasTex(256, 256, (ctx,w,h)=>{
+  const img = ctx.createImageData(w,h);
+  for(let i=0;i<img.data.length;i+=4){
+    const v = 116 + Math.random()*38;
+    img.data[i]=v; img.data[i+1]=v; img.data[i+2]=v; img.data[i+3]=255;
+  }
+  ctx.putImageData(img,0,0);
+}, false);
+anodizedTex.wrapS = anodizedTex.wrapT = THREE.RepeatWrapping;
+anodizedTex.repeat.set(8,3);
+
+/* 镜筒轴向拉丝（bump） */
+const brushedTex = canvasTex(512, 256, (ctx,w,h)=>{
+  ctx.fillStyle = '#808080'; ctx.fillRect(0,0,w,h);
+  for(let x=0;x<w;x++){
+    const v = 108 + Math.random()*50;
+    ctx.strokeStyle = `rgba(${v},${v},${v},0.5)`;
+    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke();
+  }
+}, false);
+brushedTex.wrapS = brushedTex.wrapT = THREE.RepeatWrapping;
+brushedTex.repeat.set(3,1);
+
+/* 光圈叶片细密加工纹理 */
+const bladeTex = canvasTex(512, 512, (ctx,w,h)=>{
+  ctx.fillStyle = '#131316'; ctx.fillRect(0,0,w,h);
+  ctx.translate(w/2,h/2);
+  for(let r=14;r<w*0.72;r+=7){
+    ctx.strokeStyle = `rgba(255,255,255,${0.03+Math.random()*0.05})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(0,0,r,0,7); ctx.stroke();
+  }
+  for(let i=0;i<90;i++){
+    const a = Math.random()*7;
+    ctx.strokeStyle = 'rgba(255,255,255,0.025)';
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(Math.cos(a)*w, Math.sin(a)*w); ctx.stroke();
+  }
+});
+
+/* 光圈后方柔光片（让叶片以剪影呈现） */
+const apGlowTex = canvasTex(256, 256, (ctx,w,h)=>{
+  const g = ctx.createRadialGradient(w/2,h/2,0,w/2,h/2,w/2);
+  g.addColorStop(0,'rgba(196,206,226,0.55)');
+  g.addColorStop(0.55,'rgba(150,162,186,0.22)');
+  g.addColorStop(1,'rgba(120,130,150,0)');
+  ctx.fillStyle = g; ctx.fillRect(0,0,w,h);
+});
+
+/* 前铭牌刻字 */
+const nameTex = canvasTex(2048, 128, (ctx,w,h)=>{
+  ctx.fillStyle = '#161619'; ctx.fillRect(0,0,w,h);
+  ctx.fillStyle = 'rgba(255,255,255,0.07)';
+  ctx.fillRect(0,2,w,2); ctx.fillRect(0,h-4,w,2);
+  ctx.font = '600 46px "Noto Sans SC", sans-serif';
+  ctx.fillStyle = '#d9dae0'; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+  ctx.fillText('NIKKOR     50mm     1:1.8 D     φ52', 512, h/2+2);
+  ctx.fillText('NIKKOR     50mm     1:1.8 D     φ52', 1536, h/2+2);
+});
+
+/* 对焦距离标尺：米制 + 英尺副标尺 + 景深对 + 橙色红外标记 */
+const scaleTex = canvasTex(2048, 256, (ctx,w,h)=>{
+  ctx.fillStyle = '#19191d'; ctx.fillRect(0,0,w,h);
+  const C = 1024;
+  ctx.strokeStyle = '#e9e9ee'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(C,96); ctx.lineTo(C,162); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(C,86); ctx.lineTo(C-7,100); ctx.lineTo(C+7,100); ctx.closePath();
+  ctx.fillStyle='#e9e9ee'; ctx.fill();
+  const dof = [[156,'16'],[116,'11'],[80,'8'],[48,'4']];
+  ctx.font = '400 24px "Noto Sans SC", sans-serif'; ctx.textAlign='center';
+  for(const [dx,t] of dof){
+    for(const s of [-1,1]){
+      const x = C + s*dx;
+      ctx.strokeStyle = '#c9cad0'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(x,104); ctx.lineTo(x,156); ctx.stroke();
+      ctx.fillStyle = '#c9cad0';
+      ctx.fillText(t, x, s<0 ? 92 : 196);
+    }
+  }
+  const ir = C + 64;
+  ctx.strokeStyle = '#ff7a1a'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(ir,100); ctx.lineTo(ir,158); ctx.stroke();
+  ctx.fillStyle = '#ff7a1a'; ctx.beginPath(); ctx.arc(ir,86,5,0,7); ctx.fill();
+  const rows = [
+    ['∞',214],['10',330],['5',432],['3',514],['2',594],['1.5',666],['1.2',728],['1',788],['0.8',844],['0.6',898],['0.5',940],['0.45',982]
+  ];
+  const feet = ['∞','30','15','10','7','5','4','3.3','2.7','2','1.7','1.5'];
+  ctx.textAlign='center'; ctx.textBaseline='top';
+  for(let i=0;i<rows.length;i++){
+    const [t,x] = rows[i];
+    ctx.strokeStyle = '#e6e7eb'; ctx.lineWidth = 2.4;
+    ctx.beginPath(); ctx.moveTo(x,18); ctx.lineTo(x,58); ctx.stroke();
+    ctx.font = i===0?'400 34px "Noto Sans SC", sans-serif':'400 27px "Noto Sans SC", sans-serif';
+    ctx.fillStyle = '#e6e7eb';
+    ctx.fillText(t, x, 64);
+    ctx.font = '400 23px "Noto Sans SC", sans-serif';
+    ctx.fillStyle = '#d9c47a';
+    ctx.fillText(feet[i], x, 202);
+    ctx.strokeStyle = 'rgba(217,196,122,0.9)'; ctx.lineWidth = 1.8;
+    ctx.beginPath(); ctx.moveTo(x,238); ctx.lineTo(x,252); ctx.stroke();
+  }
+  for(let i=0;i<rows.length-1;i++){
+    const x1=rows[i][1], x2=rows[i+1][1];
+    for(let k=1;k<4;k++){
+      const x = x1+(x2-x1)*k/4;
+      ctx.strokeStyle='rgba(230,231,235,0.5)'; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(x,26); ctx.lineTo(x,44); ctx.stroke();
+    }
+  }
+});
+scaleTex.wrapS = THREE.RepeatWrapping; scaleTex.offset.x = 0.5;
+
+/* 光圈环 f 值刻度（后镜筒）：对数间距 + 橙色锁定位 */
+const apRingTex = canvasTex(2048, 96, (ctx,w,h)=>{
+  ctx.fillStyle = '#151519'; ctx.fillRect(0,0,w,h);
+  ctx.fillStyle = 'rgba(255,255,255,0.06)';
+  ctx.fillRect(0,2,w,2); ctx.fillRect(0,h-4,w,2);
+  const nums = [1.8,2,2.8,4,5.6,8,11,16,22];
+  const span = Math.log(22/1.8);
+  ctx.textBaseline='middle'; ctx.textAlign='center';
+  nums.forEach(s=>{
+    const f = Math.log(s/1.8)/span;
+    const x = 150 + f*(w-320);
+    ctx.strokeStyle = s===22 ? '#ff7a1a' : '#cfd0d6';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x,10); ctx.lineTo(x,30); ctx.stroke();
+    ctx.font = s>=10 ? '400 30px "Noto Sans SC", sans-serif' : '400 32px "Noto Sans SC", sans-serif';
+    ctx.fillStyle = s===22 ? '#ff8a3a' : '#d6d7dc';
+    ctx.fillText(String(s), x, 62);
+  });
+  /* 锁定位标记 */
+  ctx.fillStyle = '#ff7a1a';
+  ctx.font = '600 24px "Noto Sans SC", sans-serif';
+  ctx.fillText('L', w-90, 62);
+});
+apRingTex.wrapS = THREE.RepeatWrapping;
+
+/* LC-52 镜头盖刻字（正反面） */
+function arcText(ctx, text, cx, cy, r, centerAngle){
+  const chars = [...text];
+  const widths = chars.map(ch=>ctx.measureText(ch).width);
+  const total = widths.reduce((a,b)=>a+b,0)/r + (chars.length-1)*0.06;
+  let a = centerAngle - total/2;
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  for(let i=0;i<chars.length;i++){
+    a += widths[i]/2/r;
+    ctx.save();
+    ctx.translate(cx+r*Math.cos(a), cy+r*Math.sin(a));
+    ctx.rotate(a+Math.PI/2);
+    ctx.fillText(chars[i],0,0);
+    ctx.restore();
+    a += widths[i]/2/r + 0.06;
+  }
+}
+const capFrontTex = canvasTex(1024,1024,(ctx,w,h)=>{
+  const g = ctx.createRadialGradient(512,470,60,512,512,520);
+  g.addColorStop(0,'#1a1a1e'); g.addColorStop(0.75,'#101013'); g.addColorStop(1,'#0a0a0c');
+  ctx.fillStyle=g; ctx.fillRect(0,0,w,h);
+  ctx.strokeStyle='rgba(255,255,255,0.12)'; ctx.lineWidth=5;
+  ctx.beginPath(); ctx.arc(512,512,468,0,7); ctx.stroke();
+  ctx.strokeStyle='rgba(255,255,255,0.06)'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.arc(512,512,436,0,7); ctx.stroke();
+  for(let i=0;i<120;i++){
+    const a=i/120*Math.PI*2;
+    ctx.strokeStyle='rgba(255,255,255,0.08)'; ctx.lineWidth=2;
+    ctx.beginPath();
+    ctx.moveTo(512+452*Math.cos(a),512+452*Math.sin(a));
+    ctx.lineTo(512+470*Math.cos(a),512+470*Math.sin(a));
+    ctx.stroke();
+  }
+  ctx.fillStyle='#e9e9ee'; ctx.textAlign='center';
+  ctx.font='700 104px "Noto Sans SC", sans-serif';
+  ctx.fillText('NIKKOR',512,498);
+  ctx.font='400 32px "Noto Sans SC", sans-serif'; ctx.fillStyle='#c6c9d0';
+  ctx.fillText('50mm  f/1.8 D',512,566);
+  ctx.font='400 30px "Noto Sans SC", sans-serif'; ctx.fillStyle='#cfd0d6';
+  arcText(ctx,'LC-52   LENS   CAP',512,512,372,-Math.PI/2);
+  arcText(ctx,'JAPAN',512,512,372,Math.PI/2);
+});
+const capBackTex = canvasTex(1024,1024,(ctx,w,h)=>{
+  const g = ctx.createRadialGradient(512,490,80,512,512,520);
+  g.addColorStop(0,'#17171b'); g.addColorStop(1,'#0c0c0f');
+  ctx.fillStyle=g; ctx.fillRect(0,0,w,h);
+  for(const ry of [330,574]){
+    const h2=120;
+    const tg = ctx.createLinearGradient(0,ry,0,ry+h2);
+    tg.addColorStop(0,'#3c3f45'); tg.addColorStop(0.5,'#2c2f35'); tg.addColorStop(1,'#22252a');
+    ctx.fillStyle=tg;
+    const x=330, wd=364, r=18;
+    ctx.beginPath();
+    ctx.moveTo(x+r,ry); ctx.arcTo(x+wd,ry,x+wd,ry+h2,r); ctx.arcTo(x+wd,ry+h2,x,ry+h2,r);
+    ctx.arcTo(x,ry+h2,x,ry,r); ctx.arcTo(x,ry,x+wd,ry,r); ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,0.12)'; ctx.lineWidth=2; ctx.stroke();
+  }
+  ctx.strokeStyle='rgba(255,255,255,0.1)'; ctx.lineWidth=5;
+  ctx.beginPath(); ctx.arc(512,512,468,0,7); ctx.stroke();
+  ctx.fillStyle='#d6d7dc'; ctx.textAlign='center';
+  ctx.font='600 78px "Noto Sans SC", sans-serif';
+  ctx.fillText('LC-52',512,500);
+  ctx.font='400 28px "Noto Sans SC", sans-serif'; ctx.fillStyle='#a6a9b0';
+  ctx.fillText('SNAP-ON FRONT CAP',512,560);
+  ctx.font='400 28px "Noto Sans SC", sans-serif';
+  arcText(ctx,'φ52 mm',512,512,372,-Math.PI/2);
+  arcText(ctx,'JAPAN',512,512,372,Math.PI/2);
+});
+const capSideTex = canvasTex(256,64,(ctx,w,h)=>{
+  ctx.fillStyle='#808080'; ctx.fillRect(0,0,w,h);
+  for(let x=4;x<w;x+=10){
+    ctx.strokeStyle='#a8a8a8'; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke();
+    ctx.strokeStyle='#5c5c5c';
+    ctx.beginPath(); ctx.moveTo(x+4,0); ctx.lineTo(x+4,h); ctx.stroke();
+  }
+}, false);
+capSideTex.wrapS = capSideTex.wrapT = THREE.RepeatWrapping;
+capSideTex.repeat.set(14,1);
+
+/* ================= 灯光：柔光箱主光 + 补光 + 轮廓光 ================= */
+THREE.RectAreaLightUniformsLib.init();
+function addRect(color, intensity, w, h, pos, tgt){
+  const l = new THREE.RectAreaLight(color, intensity, w, h);
+  l.position.set(pos[0],pos[1],pos[2]);
+  l.lookAt(tgt[0],tgt[1],tgt[2]);
+  scene.add(l);
+  return l;
+}
+const KEY = 9.0;
+addRect(0xfff3e4, KEY,       4.2, 4.2, [-3.6, 3.8, 3.8], [0,0,0]);   // 主柔光箱：左前45°上方
+addRect(0xf2f5ff, KEY*.28,   3.2, 3.2, [ 3.6, 1.0, 3.2], [0,0,0]);   // 右前补光：托暗部
+const rim = new THREE.SpotLight(0xffffff, 90, 0, 0.42, 0.9, 2);       // 轮廓光：正后偏上
+rim.position.set(0.4, 2.6, -5.6);
+rim.castShadow = true;
+rim.shadow.mapSize.set(1024,1024);
+rim.shadow.bias = -0.0001;
+const rimTarget = new THREE.Object3D(); rimTarget.position.set(0.4, 0.1, 0.4);
+scene.add(rimTarget); rim.target = rimTarget; scene.add(rim);
+/* 背景布洗墙光：均匀照亮 sweep，消除弧面掠射暗带 */
+const wash = new THREE.RectAreaLight(0xffffff, 1.2, 12, 8);
+wash.position.set(0, 2.4, 6.0); wash.lookAt(0, 1.4, -5); scene.add(wash);
+
+/* ================= 摄影棚：无缝弧形背景布（cyclorama） ================= */
+{
+  const cycMat = new THREE.MeshStandardMaterial({
+    color:0xb8b8ba, roughness:.94, metalness:0,
+    envMapIntensity:.9, side:THREE.DoubleSide
+  });
+  const yF=-1.35, R=4.0, cz=-6, cyb=yF+R;
+  const prof=[{z:26,y:yF},{z:cz,y:yF}];
+  for(let i=1;i<=18;i++){
+    const a=-Math.PI/2-(Math.PI/2)*i/18;
+    prof.push({z:cz+R*Math.cos(a), y:cyb+R*Math.sin(a)});
+  }
+  prof.push({z:cz-R, y:16});
+  const W=19, NX=28;
+  const pos=[], uv=[], idx=[];
+  for(let j=0;j<prof.length;j++){
+    for(let i=0;i<=NX;i++){
+      const x=-W+2*W*i/NX;
+      pos.push(x,prof[j].y,prof[j].z);
+      uv.push(i/NX,j/(prof.length-1));
+    }
+  }
+  for(let j=0;j<prof.length-1;j++){
+    for(let i=0;i<NX;i++){
+      const a=j*(NX+1)+i, b=a+1, c=a+(NX+1), d=c+1;
+      idx.push(a,c,b, b,c,d);
+    }
+  }
+  const cg=new THREE.BufferGeometry();
+  cg.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+  cg.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));
+  cg.setIndex(idx); cg.computeVertexNormals();
+  const cyc=new THREE.Mesh(cg,cycMat); cyc.receiveShadow=true; scene.add(cyc);
+}
+
+/* ================= 材质库 ================= */
+const M = {};
+M.anodized  = new THREE.MeshStandardMaterial({color:0x16161a, metalness:.92, roughness:.42, envMapIntensity:1.2, bumpMap:anodizedTex, bumpScale:.006});
+M.anodized2 = new THREE.MeshStandardMaterial({color:0x1e1e22, metalness:.90, roughness:.50, envMapIntensity:1.2, bumpMap:anodizedTex, bumpScale:.005});
+M.rubber    = new THREE.MeshStandardMaterial({color:0x121214, metalness:0,   roughness:.93, bumpMap:knurlTex, bumpScale:.03});
+M.brushed   = new THREE.MeshStandardMaterial({color:0x1b1b1f, metalness:.90, roughness:.42, envMapIntensity:1.2, bumpMap:brushedTex, bumpScale:.01});
+M.steel     = new THREE.MeshStandardMaterial({color:0xc6c9cf, metalness:1,   roughness:.15, envMapIntensity:1.2});
+M.steelDark = new THREE.MeshStandardMaterial({color:0x878b92, metalness:1,   roughness:.28, envMapIntensity:1.2});
+M.brass     = new THREE.MeshStandardMaterial({color:0xae8840, metalness:1,   roughness:.30, envMapIntensity:1.2});
+M.brassBright = new THREE.MeshStandardMaterial({color:0xd2ad5a, metalness:1, roughness:.17});
+M.copper    = new THREE.MeshStandardMaterial({color:0xb46832, metalness:1,   roughness:.27, envMapIntensity:1.2});
+M.gold      = new THREE.MeshStandardMaterial({color:0xd9aa3c, metalness:1,   roughness:.19});
+M.pcb       = new THREE.MeshStandardMaterial({color:0x0c5530, metalness:.05, roughness:.48});
+M.pcbDark   = new THREE.MeshStandardMaterial({color:0x083a21, metalness:.1,  roughness:.5});
+M.blade     = new THREE.MeshStandardMaterial({map:bladeTex, color:0xffffff, metalness:.85, roughness:.42, side:THREE.DoubleSide, envMapIntensity:1.0});
+M.name      = new THREE.MeshStandardMaterial({map:nameTex, metalness:.9, roughness:.36, envMapIntensity:1.2});
+M.scale     = new THREE.MeshStandardMaterial({map:scaleTex, metalness:.85, roughness:.4, envMapIntensity:1.2});
+M.capSide   = new THREE.MeshStandardMaterial({color:0x141417, metalness:.6, roughness:.5, bumpMap:capSideTex, bumpScale:.02});
+M.cell      = new THREE.MeshStandardMaterial({color:0x0d0d10, metalness:.8, roughness:.45, envMapIntensity:1.2});
+M.black     = new THREE.MeshStandardMaterial({color:0x08080a, metalness:.7, roughness:.55, envMapIntensity:1.1});
+M.smd       = new THREE.MeshStandardMaterial({color:0x23262b, metalness:.6, roughness:.4});
+
+/* 玻璃：真实透射 + 薄膜干涉镀膜 */
+function glass(tint, range, thickness=.26){
+  const c = new THREE.Color(tint);
+  return new THREE.MeshPhysicalMaterial({
+    color:c.clone().lerp(new THREE.Color(0xffffff),.70),
+    roughness:.03, metalness:0,
+    transmission:.88, ior:1.52, thickness,
+    attenuationColor:c, attenuationDistance:1.5,
+    iridescence:1, iridescenceIOR:1.3, iridescenceThicknessRange:range,
+    specularColor:c.clone().lerp(new THREE.Color(0xffffff),.45),
+    emissive:c, emissiveIntensity:.05,
+    envMapIntensity:1.5, specularIntensity:1,
+    clearcoat:.45, clearcoatRoughness:.04
+  });
+}
+M.g1 = glass(0x8ff0b0, [100,220]);   // 绿
+M.g2 = glass(0xf08fd8, [220,350]);   // 洋红
+M.g3 = glass(0xb08ff0, [150,260]);   // 紫
+M.g4 = glass(0xf0c060, [300,460]);   // 琥珀
+M.g5 = glass(0x6fe0d0, [90,180]);    // 青
+M.g6 = glass(0xc08ff0, [200,330]);   // 紫
+
+/* ================= 几何辅助（光轴沿 X，前为 -X） ================= */
+function mesh(geo, mat){ return new THREE.Mesh(geo, mat); }
+function cylX(rt, rb, len, mat, seg=96, open=true){
+  const g = new THREE.CylinderGeometry(rt, rb, len, seg, 1, open);
+  g.rotateZ(Math.PI/2);
+  return mesh(g, mat);
+}
+function torusX(r, tube, mat, rad=14, tub=96){
+  const g = new THREE.TorusGeometry(r, tube, rad, tub);
+  g.rotateY(Math.PI/2);
+  return mesh(g, mat);
+}
+function ringX(inner, outer, mat){
+  const g = new THREE.RingGeometry(inner, outer, 96);
+  g.rotateY(Math.PI/2);
+  return mesh(g, mat);
+}
+function discX(r, mat, face=-1){
+  const g = new THREE.CircleGeometry(r, 96);
+  g.rotateY(face<0 ? -Math.PI/2 : Math.PI/2);
+  return mesh(g, mat);
+}
+/* 镜片曲面：bf/bb 为前后表面曲率（正=凸），tEdge 为边厚 */
+function lensGeo(a, tEdge, bf, bb, n=26){
+  const pts = [];
+  const xf = r => tEdge/2 + bf*(1-(r/a)**2);
+  const xb = r => -tEdge/2 - bb*(1-(r/a)**2);
+  pts.push(new THREE.Vector2(0, xf(0)));
+  for(let i=1;i<=n;i++) pts.push(new THREE.Vector2(a*i/n, xf(a*i/n)));
+  for(let i=n;i>=0;i--) pts.push(new THREE.Vector2(a*i/n, xb(a*i/n)));
+  const g = new THREE.LatheGeometry(pts, 96);
+  g.rotateZ(Math.PI/2);
+  return g;
+}
+/* 镜片 + 暗色边圈 + 镜组隔圈 */
+function element(a, tEdge, bf, bb, gmat){
+  const grp = new THREE.Group();
+  grp.add(mesh(lensGeo(a,tEdge,bf,bb), gmat));
+  const band = cylX(a+0.012, a+0.012, tEdge+0.03, M.black, 64, true);
+  grp.add(band);
+  const w = tEdge + 0.16;
+  const cell = cylX(a+0.075, a+0.075, w, M.cell, 80, true);
+  grp.add(cell);
+  const l1 = torusX(a+0.075,.018,M.cell,10,80); l1.position.x = -w/2; grp.add(l1);
+  const l2 = torusX(a+0.075,.018,M.cell,10,80); l2.position.x =  w/2; grp.add(l2);
+  return grp;
+}
+
+/* ================= 镜头零件 ================= */
+const rig = new THREE.Group();
+scene.add(rig);
+const parts = [];
+function part(base, off, delay, dur, content){
+  const g = new THREE.Group();
+  g.position.x = base;
+  if(content) g.add(content);
+  rig.add(g);
+  const o = {group:g, base, off, delay, dur, prog:0, labels:[]};
+  parts.push(o);
+  return o;
+}
+function addLabel(p, anchor, title, sub, bar='#d8d9de'){
+  p.labels.push({anchor:anchor.clone(), title, sub, bar});
+}
+const deg = THREE.MathUtils.degToRad;
+
+/* ---------- LC-52 镜头盖 ---------- */
+{
+  const flip = new THREE.Group();
+  const body = cylX(.99,.99,.16,M.capSide,96,false);
+  flip.add(body);
+  const fMat = new THREE.MeshStandardMaterial({map:capFrontTex, roughness:.5, metalness:.3});
+  const bMat = new THREE.MeshStandardMaterial({map:capBackTex,  roughness:.5, metalness:.3});
+  const front = discX(.97, fMat, -1); front.position.x = -.085; flip.add(front);
+  const back  = discX(.97, bMat, +1); back.position.x  =  .085; flip.add(back);
+  const l1 = torusX(.97,.02,M.anodized); l1.position.x = -.085; flip.add(l1);
+  const l2 = torusX(.97,.02,M.anodized); l2.position.x =  .085; flip.add(l2);
+  /* 立体弹簧卡扣（内侧） */
+  for(const sy of [-1,1]){
+    const latch = new THREE.Mesh(new THREE.BoxGeometry(.045,.11,.60), M.steelDark);
+    latch.position.set(.115, sy*.245, 0);
+    flip.add(latch);
+    const nub = new THREE.Mesh(new THREE.BoxGeometry(.03,.05,.12), M.black);
+    nub.position.set(.14, sy*.245, .30);
+    flip.add(nub);
+  }
+  const p = part(-0.98, -2.9, 0.00, .12, flip);
+  p.flip = flip;
+  addLabel(p, new THREE.Vector3(0,1.06,0), 'LC-52 镜头盖', '正反面精细刻字 · 弹簧卡扣');
+}
+
+/* ---------- 前铭牌 + 前镜筒 + 对焦环（同一组件） ---------- */
+{
+  const fg = new THREE.Group();
+  const nr = cylX(1.0,1.0,.24,M.name); nr.position.x = -.40; fg.add(nr);
+  for(let i=0;i<3;i++){
+    const t = torusX(.915,.007,M.anodized2,8,80);
+    t.position.x = -.50 + i*.05; fg.add(t);
+  }
+  const lip0 = torusX(1.0,.02,M.anodized); lip0.position.x = -.53; fg.add(lip0);
+  const sb = cylX(.99,.99,.16,M.scale); sb.position.x = -.16; fg.add(sb);
+  const pip = new THREE.Mesh(new THREE.BoxGeometry(.012,.03,.07),
+    new THREE.MeshBasicMaterial({color:0xf2f2f5}));
+  pip.position.set(-.27,.995,0); fg.add(pip);
+  const rr = cylX(1.0,1.0,.42,M.rubber); rr.position.x = .14; fg.add(rr);
+  const rc = cylX(.97,.92,.18,M.brushed,96,false); rc.position.x = .46; fg.add(rc);
+  for(const [x,r] of [[-.27,1.0],[.36,1.0],[.55,.97]]){
+    const t = torusX(r,.016,M.anodized); t.position.x = x; fg.add(t);
+  }
+  const inner = cylX(.82,.78,.92,M.black,80,true); inner.position.x = .02; fg.add(inner);
+  const p = part(-0.5, -1.7, 0.08, .14, fg);
+  addLabel(p, new THREE.Vector3(0,1.13,0), '前镜筒组件', '前铭牌 · 对焦环 · 距离标尺');
+}
+
+/* ---------- 第一片：正弯月 ---------- */
+{
+  const c = element(.68,.10,.16,-.06,M.g1);
+  const p = part(-.30, -.95, .22, .12, c);
+  addLabel(p, new THREE.Vector3(0,.80,0), '第一片 · 正弯月透镜', '第一组 · 绿色镀膜');
+}
+/* ---------- 第二片：负弯月 ---------- */
+{
+  const c = element(.62,.20,.05,-.22,M.g2);
+  const p = part(-.13, -.50, .28, .12, c);
+  addLabel(p, new THREE.Vector3(0,.74,0), '第二片 · 负弯月透镜', '第二组 · 洋红镀膜');
+}
+/* ---------- 第三组：胶合镜片（E3 + E4） ---------- */
+{
+  const g = new THREE.Group();
+  const e3 = element(.60,.10,.20,.02,M.g3); e3.position.x = -.065; g.add(e3);
+  const e4 = element(.60,.20,-.16,-.03,M.g4); e4.position.x = .085; g.add(e4);
+  const p = part(.02, -.12, .34, .10, g);
+  addLabel(p, new THREE.Vector3(0,.74,0), '第三、四片 · 胶合镜片', '第三组 · 紫 / 琥珀镀膜');
+}
+/* ---------- 五叶光圈 ---------- */
+{
+  const ap = new THREE.Group();
+  const housing = cylX(.72,.72,.10,M.anodized,96,true); ap.add(housing);
+  const ha = torusX(.72,.02,M.anodized); ha.position.x = -.05; ap.add(ha);
+  const hb = torusX(.72,.02,M.anodized); hb.position.x =  .05; ap.add(hb);
+  const s = new THREE.Shape();
+  s.moveTo(.42,-.30);
+  s.quadraticCurveTo(.66,0,.42,.30);
+  s.lineTo(-.06,.52);
+  s.quadraticCurveTo(-.55,0,-.06,-.52);
+  s.closePath();
+  const bg = new THREE.ShapeGeometry(s,20);
+  bg.rotateY(-Math.PI/2);
+  const blades = [];
+  const Rp = .62;
+  for(let k=0;k<5;k++){
+    const alpha = k*Math.PI*2/5;
+    const pivot = new THREE.Group();
+    pivot.position.set(0, Rp*Math.cos(alpha), Rp*Math.sin(alpha));
+    const bm = new THREE.Mesh(bg, M.blade);
+    bm.position.x = k*.006;
+    pivot.add(bm);
+    ap.add(pivot);
+    blades.push(pivot);
+    const pin = cylX(.028,.028,.07,M.steelDark,24,false);
+    pin.position.set(0, Rp*Math.cos(alpha), Rp*Math.sin(alpha));
+    ap.add(pin);
+  }
+  const glowGeo = new THREE.CircleGeometry(.52, 64);
+  glowGeo.rotateY(-Math.PI/2);
+  const glow = new THREE.Mesh(glowGeo, new THREE.MeshBasicMaterial({
+    map:apGlowTex, transparent:true, depthWrite:false, side:THREE.FrontSide
+  }));
+  glow.position.x = .16;
+  ap.add(glow);
+  const p = part(.18, .18, .40, .10, ap);
+  p.blades = blades;
+  addLabel(p, new THREE.Vector3(0,.80,0), '五叶光圈', '黑化金属叶片 · f/1.8–f/22');
+}
+/* ---------- 第四组：胶合镜片（E5 + E6） ---------- */
+{
+  const g = new THREE.Group();
+  const e5 = element(.55,.18,-.16,.03,M.g5); e5.position.x = -.075; g.add(e5);
+  const e6 = element(.55,.10,.02,.19,M.g6); e6.position.x = .085; g.add(e6);
+  const p = part(.32, .62, .44, .12, g);
+  addLabel(p, new THREE.Vector3(0,.68,0), '第五、六片 · 胶合镜片', '第四组 · 青 / 紫镀膜');
+}
+/* ---------- 后镜筒 ---------- */
+{
+  const rb = new THREE.Group();
+  const sleeve = cylX(.92,.90,1.18,M.anodized,96,true); rb.add(sleeve);
+  const inner = cylX(.78,.76,1.18,M.black,80,true); rb.add(inner);
+  const apBand = cylX(.925,.925,.10,
+    new THREE.MeshStandardMaterial({map:apRingTex, metalness:.9, roughness:.44, envMapIntensity:1.2}),96,false);
+  apBand.position.x = -.06; rb.add(apBand);
+  for(let i=0;i<9;i++){
+    const t = torusX(.91,.010,M.anodized2,8,90);
+    t.position.x = .12 + i*.052; rb.add(t);
+  }
+  const lf = torusX(.92,.018,M.anodized); lf.position.x = -.59; rb.add(lf);
+  const lr = torusX(.90,.020,M.anodized); lr.position.x =  .59; rb.add(lr);
+  const p = part(.55, 1.35, .56, .12, rb);
+  addLabel(p, new THREE.Vector3(0,1.0,0), '后镜筒', '黑色阳极氧化金属');
+}
+
+/* ---------- 黄铜对焦螺纹筒 ---------- */
+{
+  const hc = new THREE.Group();
+  const dark = cylX(.72,.72,.5,M.black,80,true); hc.add(dark);
+  const outer = cylX(.83,.83,.5,M.brass,96,true); hc.add(outer);
+  class HelixCurve extends THREE.Curve{
+    getPoint(t){
+      const x = -.25 + .5*t;
+      const a = t*1.25*Math.PI*2 + this.ph;
+      return new THREE.Vector3(x, .85*Math.cos(a), .85*Math.sin(a));
+    }
+  }
+  for(const ph of [0, Math.PI]){
+    const c = new HelixCurve(); c.ph = ph;
+    hc.add(mesh(new THREE.TubeGeometry(c,180,.018,8), M.brassBright));
+  }
+  const la = torusX(.83,.02,M.brass); la.position.x = -.25; hc.add(la);
+  const lb = torusX(.83,.02,M.brass); lb.position.x =  .25; hc.add(lb);
+  const p = part(.80, 2.0, .62, .12, hc);
+  addLabel(p, new THREE.Vector3(0,.92,0), '黄铜对焦螺纹筒', '多头螺旋 · 对焦传动');
+}
+
+/* ---------- 铜绕组环 ---------- */
+{
+  const cr = new THREE.Group();
+  const core = cylX(.60,.60,.30,M.black,80,false); cr.add(core);
+  for(let i=0;i<15;i++){
+    const coil = torusX(.64,.011,M.copper,8,96);
+    coil.position.x = -.13 + i*.26/14;
+    cr.add(coil);
+  }
+  const la = torusX(.64,.02,M.copper); la.position.x = -.15; cr.add(la);
+  const lb = torusX(.64,.02,M.copper); lb.position.x =  .15; cr.add(lb);
+  const p = part(.98, 2.55, .68, .10, cr);
+  addLabel(p, new THREE.Vector3(0,.78,0), '铜绕组环', '漆包铜线绕组');
+}
+
+/* ---------- CPU 电路板（七个金色触点） ---------- */
+{
+  const pb = new THREE.Group();
+  const boardGeo = new THREE.RingGeometry(.80,1.02,64,1,deg(52),deg(64));
+  boardGeo.rotateY(Math.PI/2);
+  pb.add(mesh(boardGeo, M.pcb));
+  for(let i=0;i<7;i++){
+    const a = deg(56 + i*52/6);
+    const pad = new THREE.Mesh(new THREE.BoxGeometry(.05,.055,.02), M.gold);
+    pad.position.set(-.02,.95*Math.cos(a),.95*Math.sin(a));
+    pb.add(pad);
+    const tail = new THREE.Mesh(new THREE.BoxGeometry(.12,.018,.018), M.gold);
+    tail.position.set(.05,.93*Math.cos(a),.93*Math.sin(a));
+    pb.add(tail);
+  }
+  for(const r of [.84,.98]){
+    const tr = new THREE.RingGeometry(r,r+.008,64,1,deg(54),deg(60));
+    tr.rotateY(Math.PI/2);
+    pb.add(mesh(tr, M.gold));
+  }
+  for(let i=0;i<5;i++){
+    const a = deg(60 + i*9);
+    const c = new THREE.Mesh(new THREE.BoxGeometry(.04,.03,.06), M.smd);
+    c.position.set(.02,.88*Math.cos(a),.88*Math.sin(a));
+    pb.add(c);
+  }
+  /* 主控 IC 与细走线 */
+  const ic = new THREE.Mesh(new THREE.BoxGeometry(.05,.10,.07),
+    new THREE.MeshStandardMaterial({color:0x14161a, metalness:.4, roughness:.35}));
+  ic.position.set(.025,.85*Math.cos(deg(92)),.85*Math.sin(deg(92)));
+  pb.add(ic);
+  for(let i=0;i<3;i++){
+    const a = deg(78 + i*12);
+    const tr = new THREE.Mesh(new THREE.BoxGeometry(.012,.012,.22), M.gold);
+    tr.position.set(.015,.90*Math.cos(a),.90*Math.sin(a));
+    tr.rotation.x = a;
+    pb.add(tr);
+  }
+  const p = part(1.16, 3.1, .72, .10, pb);
+  addLabel(p, new THREE.Vector3(0,1.07,0), 'CPU 电路板', '七个金色触点 · 测光联动');
+}
+
+/* ---------- F 型金属卡口 ---------- */
+{
+  const mt = new THREE.Group();
+  const prof = [
+    new THREE.Vector2(.85,-.09), new THREE.Vector2(1.18,-.09),
+    new THREE.Vector2(1.18,.07), new THREE.Vector2(1.0,.07),
+    new THREE.Vector2(1.0,.12),  new THREE.Vector2(.85,.12)
+  ];
+  const fl = new THREE.LatheGeometry(prof,96);
+  fl.rotateZ(Math.PI/2);
+  mt.add(mesh(fl, M.steel));
+  const thr = cylX(.85,.85,.2,M.steelDark,96,true);
+  thr.position.x = .02; mt.add(thr);
+  for(const aDeg of [80,220,320]){
+    const a = deg(aDeg);
+    const lug = new THREE.Mesh(new THREE.BoxGeometry(.10,.42,.16), M.steel);
+    lug.position.set(-.12, 1.0*Math.cos(a), 1.0*Math.sin(a));
+    lug.rotation.x = a;
+    mt.add(lug);
+  }
+  for(const aDeg of [20,140,260]){
+    const a = deg(aDeg);
+    const sc = cylX(.045,.045,.03,M.steelDark,24,false);
+    sc.position.set(-.11,.72*Math.cos(a),.72*Math.sin(a));
+    mt.add(sc);
+    const slot = new THREE.Mesh(new THREE.BoxGeometry(.012,.07,.02),M.black);
+    slot.position.set(-.128,.72*Math.cos(a),.72*Math.sin(a));
+    slot.rotation.x = a;
+    mt.add(slot);
+  }
+  const lever = new THREE.Mesh(new THREE.BoxGeometry(.05,.10,.18), M.black);
+  lever.position.set(-.08,.86*Math.cos(deg(300)),.86*Math.sin(deg(300)));
+  lever.rotation.x = deg(300);
+  mt.add(lever);
+  const dot = new THREE.Mesh(new THREE.SphereGeometry(.035,16,12),
+    new THREE.MeshStandardMaterial({color:0xf0f0f2,roughness:.4,metalness:.2}));
+  dot.position.set(.02,1.19,0);
+  mt.add(dot);
+  const p = part(1.28, 3.6, .78, .12, mt);
+  addLabel(p, new THREE.Vector3(0,1.23,0), 'F 型金属卡口', '抛光不锈钢 · 对位点');
+}
+
+/* ---------- 卡口压圈 ---------- */
+{
+  const rt = new THREE.Group();
+  const ring = ringX(.62,1.05,M.steelDark); rt.add(ring);
+  const band = cylX(1.05,1.05,.05,M.steelDark,96,true); rt.add(band);
+  for(const aDeg of [30,210]){
+    const a = deg(aDeg);
+    const s = new THREE.Mesh(new THREE.BoxGeometry(.06,.03,.10), M.black);
+    s.position.set(-.03,1.0*Math.cos(a),1.0*Math.sin(a));
+    s.rotation.x = a;
+    rt.add(s);
+  }
+  for(let i=0;i<3;i++){
+    const t = torusX(1.05,.008,M.steel,8,96);
+    t.position.x = -.02 + i*.02;
+    rt.add(t);
+  }
+  const p = part(1.42, 4.15, .84, .10, rt);
+  addLabel(p, new THREE.Vector3(0,1.08,0), '卡口压圈', '扳手槽 · 锁紧');
+}
+
+/* ---------- 调节垫片 ---------- */
+{
+  const sh = new THREE.Group();
+  const w1 = ringX(.60,1.10,M.steelDark); w1.position.x = -.05; sh.add(w1);
+  const b1 = cylX(1.10,1.10,.02,M.steelDark,96,true); b1.position.x=-.05; sh.add(b1);
+  const w2 = ringX(.62,1.08,M.brass); w2.position.x = .05; sh.add(w2);
+  const b2 = cylX(1.08,1.08,.02,M.brass,96,true); b2.position.x=.05; sh.add(b2);
+  const p = part(1.52, 4.7, .88, .10, sh);
+  addLabel(p, new THREE.Vector3(0,1.13,0), '调节垫片', '法兰距精密调整');
+}
+
+/* ================= 接触阴影（柔和 fake shadow 承托悬浮零件） ================= */
+const contactTex = canvasTex(256,256,(ctx,w,h)=>{
+  const g=ctx.createRadialGradient(128,128,0,128,128,128);
+  g.addColorStop(0,'rgba(10,10,14,0.42)');
+  g.addColorStop(.55,'rgba(10,10,14,0.16)');
+  g.addColorStop(1,'rgba(10,10,14,0)');
+  ctx.fillStyle=g; ctx.fillRect(0,0,w,h);
+}, false);
+const blobSizes=[2.2,2.4,1.7,1.6,1.7,1.8,1.6,2.3,2.0,1.7,2.2,2.6,2.2,2.3];
+const partBlobs=parts.map((pp,i)=>{
+  const s=blobSizes[i]||1.8;
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(s,s*.58),
+    new THREE.MeshBasicMaterial({map:contactTex,transparent:true,depthWrite:false,opacity:0}));
+  m.rotation.x=-Math.PI/2; m.position.set(pp.base,-1.32,0.1);
+  scene.add(m); return m;
+});
+const mainBlob=new THREE.Mesh(new THREE.PlaneGeometry(2.7,1.6),
+  new THREE.MeshBasicMaterial({map:contactTex,transparent:true,depthWrite:false,opacity:.26}));
+mainBlob.rotation.x=-Math.PI/2; mainBlob.position.set(.12,-1.32,0.1);
+scene.add(mainBlob);
+
+/* ================= 细引线标签 ================= */
+const labelLayer = document.getElementById('labels');
+const svg = document.getElementById('leaders');
+const allLabels = [];
+for(const p of parts){
+  for(const d of p.labels){
+    const el = document.createElement('div');
+    el.className = 'v-label';
+    el.innerHTML = `<span class="bar" style="background:${d.bar}"></span>
+      <div class="t">${d.title}</div><div class="s">${d.sub}</div>`;
+    labelLayer.appendChild(el);
+    allLabels.push({part:p, ...d, el, w:0, h:0, sx:0, sy:0, px:0, py:0, vis:0});
+  }
+}
+const _v = new THREE.Vector3();
+const _v2 = new THREE.Vector3();
+function updateLabels(){
+  const W = innerWidth, H = innerHeight;
+  const items = [];
+  for(const L of allLabels){
+    const show = L.part.prog > .55 ? 1 : 0;
+    L.vis += (show - L.vis)*.12;
+    if(L.vis < .02){ L.el.style.opacity = 0; continue; }
+    _v.copy(L.anchor);
+    L.part.group.localToWorld(_v);
+    _v.project(camera);
+    if(_v.z > 1){ L.el.style.opacity = 0; continue; }
+    L.sx = (_v.x*.5+.5)*W;
+    L.sy = (-_v.y*.5+.5)*H;
+    _v2.copy(L.anchor);
+    const ar = Math.hypot(L.anchor.y, L.anchor.z) || 1;
+    _v2.y += .55*L.anchor.y/ar; _v2.z += .55*L.anchor.z/ar;
+    L.part.group.localToWorld(_v2); _v2.project(camera);
+    L.bx = (_v2.x*.5+.5)*W; L.by = (-_v2.y*.5+.5)*H;
+    if(!L.w){ L.w = L.el.offsetWidth; L.h = L.el.offsetHeight; }
+    items.push(L);
+  }
+  /* 方位选择：径向外推；外推点落在侧面时改为水平避让 */
+  for(const L of items){
+    if(Math.abs(L.by-L.sy) >= 24){
+      L.py = L.by;
+      const x0 = L.bx >= L.sx ? L.bx+8 : L.bx-8-L.w;
+      L.px = Math.max(6, Math.min(W-L.w-6, x0));
+    } else {
+      L.py = L.sy;
+      const x0 = L.sx + (L.sx < W/2 ? 92 : -92-L.w);
+      L.px = Math.max(6, Math.min(W-L.w-6, x0));
+    }
+  }
+  /* 垂直方向错峰避让 */
+  items.sort((a,b)=>a.py-b.py);
+  const gap = isMobile ? 40 : 46;
+  for(let i=0;i<items.length;i++){
+    let y = items[i].py;
+    for(let j=0;j<i;j++){
+      if(Math.abs(y-items[j].py) < gap) y = items[j].py + gap;
+    }
+    items[i].py = y;
+  }
+  if(items.length){
+    const dockTop = document.getElementById('dock').getBoundingClientRect().top;
+    const bottomLimit = Math.min(H-112, dockTop-14);
+    const over = items[items.length-1].py - bottomLimit;
+    if(over>0) for(const it of items) it.py -= over;
+    const top = items[0].py - 40;
+    if(top<0) for(const it of items) it.py -= top;
+  }
+  let svgHtml = '';
+  for(const L of items){
+    L.el.style.transform = `translate(${L.px}px,${L.py-L.h/2}px)`;
+    L.el.style.opacity = Math.min(1, L.vis);
+    const edgeX = L.px > L.sx ? L.px : L.px + L.w;
+    svgHtml += `<path d="M${L.sx.toFixed(1)} ${L.sy.toFixed(1)} L${edgeX.toFixed(1)} ${L.py.toFixed(1)}"
+      stroke="rgba(20,20,28,0.32)" stroke-width="1"/>`;
+    svgHtml += `<circle cx="${L.sx.toFixed(1)}" cy="${L.sy.toFixed(1)}" r="2.3" fill="${L.bar}"/>`;
+    svgHtml += `<circle cx="${edgeX.toFixed(1)}" cy="${L.py.toFixed(1)}" r="1.5" fill="rgba(20,20,28,0.5)"/>`;
+  }
+  svg.innerHTML = svgHtml;
+}
+
+/* ================= 后处理 ================= */
+const composer = new THREE.EffectComposer(renderer);
+composer.addPass(new THREE.RenderPass(scene, camera));
+const bloom = new THREE.UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), .12, .55, .88);
+composer.addPass(bloom);
+composer.addPass(new THREE.ShaderPass(THREE.GammaCorrectionShader));
+
+/* ================= 状态与交互 ================= */
+const slExplode = document.getElementById('slExplode');
+const slAperture = document.getElementById('slAperture');
+const outExplode = document.getElementById('outExplode');
+const outAperture = document.getElementById('outAperture');
+const btnAuto = document.getElementById('btnAuto');
+const btnReset = document.getElementById('btnReset');
+
+const stops = [1.8, 2, 2.8, 4, 5.6, 8, 11, 16, 22];
+(()=>{
+  const wrap = document.getElementById('apTicks');
+  stops.forEach((s,i)=>{
+    const el = document.createElement('i');
+    el.textContent = s;
+    el.style.left = (i/8*100)+'%';
+    wrap.appendChild(el);
+  });
+})();
+const state = { p:0, open:1, auto:false, t:0, LOOP:26 };
+
+const smooth = x => { x=Math.min(1,Math.max(0,x)); return x*x*(3-2*x); };
+const partProg = (p,d,dur)=> smooth((p-d)/dur);
+function kf(tt, arr){
+  for(let i=0;i<arr.length-1;i++){
+    const t0=arr[i][0], v0=arr[i][1], t1=arr[i+1][0], v1=arr[i+1][1];
+    if(tt>=t0 && tt<=t1) return v0+(v1-v0)*smooth((tt-t0)/(t1-t0));
+  }
+  return arr[arr.length-1][1];
+}
+
+function setExplodeUI(){
+  slExplode.value = Math.round(state.p*100);
+  outExplode.textContent = Math.round(state.p*100)+'%';
+  slExplode.style.setProperty('--fill', state.p*100+'%');
+}
+function setApertureUI(){
+  const f = Math.min(22, 1.8/Math.max(.001,state.open));
+  let idx=0, best=99;
+  stops.forEach((s,i)=>{
+    const d=Math.abs(Math.log(s/f));
+    if(d<best){ best=d; idx=i; }
+  });
+  slAperture.value = idx;
+  outAperture.textContent = 'f/'+stops[idx];
+  slAperture.style.setProperty('--fill', idx/8*100+'%');
+}
+function stopAuto(){
+  state.auto = false;
+  btnAuto.textContent = '自动演示';
+  btnAuto.classList.add('primary');
+}
+slExplode.addEventListener('input', ()=>{ stopAuto(); state.p=slExplode.value/100; setExplodeUI(); });
+slAperture.addEventListener('input', ()=>{ stopAuto(); state.open=1.8/stops[+slAperture.value]; setApertureUI(); });
+btnAuto.addEventListener('click', ()=>{
+  state.auto = !state.auto;
+  if(state.auto){
+    btnAuto.textContent = '停止演示';
+    btnAuto.classList.remove('primary');
+    state.t = 0;
+  } else {
+    btnAuto.textContent = '自动演示';
+    btnAuto.classList.add('primary');
+  }
+});
+btnReset.addEventListener('click', ()=>{
+  const ep = smooth(state.p);
+  const mob = innerWidth < 720;
+  const dist = (mob ? 11.6 : 8) + ((mob ? 22.5 : 13.8)-(mob ? 11.6 : 8))*ep;
+  camera.position.copy(controls.target).addScaledVector(viewDir, dist);
+});
+
+/* ================= 每帧应用 ================= */
+let lastFramingP = -1;
+function applyScene(dt){
+  rig.rotation.x += dt*.09;   // 绕光轴缓慢自转
+  const es = innerWidth < 720 ? .62 : 1;
+  for(let pi=0; pi<parts.length; pi++){
+    const p = parts[pi];
+    p.prog = partProg(state.p, p.delay, p.dur);
+    p.group.position.x = p.base + p.off*es*p.prog;
+    partBlobs[pi].position.x = p.group.position.x;
+    partBlobs[pi].material.opacity = .18*p.prog;
+    if(p.blades){
+      const u = Math.max(0, Math.min(1, (state.open-.082)/.918));
+      const spin = -.25 + (-1.2+.25)*u;
+      p.blades.forEach((pv,k)=>{
+        pv.rotation.x = k*Math.PI*2/5 + Math.PI/2 + spin;
+      });
+    }
+  }
+  mainBlob.material.opacity = .26*(1-.9*smooth(state.p));
+  /* 取景随爆炸程度拉开（仅在 p 变化时，避免与用户缩放冲突） */
+  if(Math.abs(state.p-lastFramingP) > .001){
+    const ep = smooth(state.p);
+    const mob = innerWidth < 720;
+    const desired = (mob ? 11.6 : 8) + ((mob ? 22.5 : 13.8)-(mob ? 11.6 : 8))*ep;
+    const dir = camera.position.clone().sub(controls.target);
+    const cur = dir.length();
+    camera.position.addScaledVector(dir.normalize(), desired-cur);
+    const tx = -.25 + 1.3*es*ep;
+    controls.target.x += (tx-controls.target.x)*.12;
+    lastFramingP = state.p;
+  }
+}
+
+/* ================= 主循环 ================= */
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+let last = performance.now();
+function tick(now){
+  requestAnimationFrame(tick);
+  let dt = (now-last)/1000; last = now;
+  dt = Math.min(dt, .05);
+  if(state.auto && !reduced){
+    state.t += dt;
+    const tt = (state.t%state.LOOP)/state.LOOP;
+    state.p = kf(tt, [[0,0],[.42,1],[.70,1],[.90,0],[1,0]]);
+    const b = kf(tt, [[0,0],[.30,1],[.62,1],[.82,0]]);
+    state.open = 1.8/(1.8 + b*(16-1.8));
+    setExplodeUI(); setApertureUI();
+  }
+  applyScene(reduced ? 0 : dt);
+  controls.update();
+  updateLabels();
+  composer.render();
+}
+addEventListener('resize', ()=>{
+  camera.aspect = innerWidth/innerHeight;
+  camera.fov = innerWidth < 720 ? 42 : 34;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  composer.setSize(innerWidth, innerHeight);
+  lastFramingP = -1;
+});
+
+/* 首帧立即渲染（不等 load） */
+rig.traverse(o=>{
+  if(o.isMesh){
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    o.castShadow = mats.every(m=>!m.transparent && !(m.transmission>0));
+  }
+});
+setExplodeUI();
+setApertureUI();
+applyScene(0);
+controls.update();
+composer.render();
+window.__sceneReady = true;
+const loaderEl = document.getElementById('loader');
+setTimeout(()=>{
+  loaderEl.style.opacity = 0;
+  setTimeout(()=>{ loaderEl.style.display='none'; }, 700);
+}, 400);
+requestAnimationFrame(tick);
+
+</script>
+</body>
+</html>
